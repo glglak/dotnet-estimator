@@ -1,5 +1,6 @@
 ```markdown
 # .NET Project Estimate Generator
+**Live Demo**: The project runs at the following URL: [https://glglak.github.io/dotnet-estimator/](https://glglak.github.io/dotnet-estimator/)
 
 A simple and powerful tool to estimate project effort for .NET projects based on selected components, complexity factors, and additional configuration options. This tool helps project managers and developers get a quick estimate of project man-days and highlights additional complexities from dependencies and integrations.
 
