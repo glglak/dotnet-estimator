@@ -1,5 +1,3 @@
-Here’s a `README.md` file tailored to your project, explaining installation, features, tech stack, and how to contribute.
-
 ```markdown
 # .NET Project Estimate Generator
 
@@ -82,16 +80,3 @@ Please follow best practices and include clear documentation with your contribut
 ## License
 
 This project is licensed under the MIT License. See `LICENSE` for more information.
-
----
-
-Thank you for contributing to .NET Project Estimate Generator! Together, we can make project planning and estimation easier for everyone.
-```
-
-### Summary of Content
-
-- **Project Title**: `.NET Project Estimate Generator`.
-- **Features**: Summarized the main features, such as component selection, complexity adjustment, and file handling.
-- **Stack**: Listed technologies used.
-- **Installation Instructions**: Provided clear steps for cloning, installing, and running the project.
-- **Contributing**: Encouraged contributions with steps to submit a pull request.
