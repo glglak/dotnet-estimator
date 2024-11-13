@@ -44,7 +44,18 @@ const DotNetEstimateForge = () => {
       }
     }
   };
-
+  const roles = {
+    developer: { name: "Developer", hourlyRate: 50 },
+    designer: { name: "Senior Developer", hourlyRate: 40 },
+    tester: { name: "Team Lead", hourlyRate: 30 },
+  };
+  const [complexityFactors, setComplexityFactors] = useState({
+    dependencies: 1.0,
+    integrations: 1.0,
+  });
+  
+  
+  
   const complexityMultipliers = {
     low: 0.8,
     medium: 1.0,
@@ -63,16 +74,26 @@ const DotNetEstimateForge = () => {
     type: 'domainModel',
     title: '',
     pattern: 'simple',
+    role: 'developer', // Default role
     complexity: 'medium',
+    complexityFactors: {
+      dependencies: 1.0,
+      integrations: 1.0,
+    },
     metrics: getInitialMetrics('domainModel'),
     assumptions: '',
     risks: ''
   }]);
 
+
   const updateComponent = (id, field, value) => {
     setComponents(prev => prev.map(component => {
       if (component.id !== id) return component;
-      
+      <select onChange={(e) => updateComponent(component.id, 'role', e.target.value)} value={component.role}>
+  {Object.keys(roles).map((roleKey) => (
+    <option key={roleKey} value={roleKey}>{roles[roleKey].name}</option>
+  ))}
+</select>
       if (field === 'type') {
         return {
           ...component,
@@ -84,6 +105,54 @@ const DotNetEstimateForge = () => {
       return { ...component, [field]: value };
     }));
   };
+
+
+  const updateComplexityFactor = (id, factor, value) => {
+    setComponents((prevComponents) =>
+      prevComponents.map((component) =>
+        component.id === id
+          ? {
+              ...component,
+              complexityFactors: {
+                ...component.complexityFactors,
+                [factor]: value,
+              },
+            }
+          : component
+      )
+    );
+  };
+  // Function to save the project to a JSON file
+// Function to save the project to a JSON file
+const saveProject = () => {
+  const projectData = JSON.stringify(components);
+  const blob = new Blob([projectData], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `project_estimate_${new Date().toISOString().split("T")[0]}.json`;
+  link.click();
+};
+
+// Function to load the project from a JSON file
+const loadProject = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const loadedData = JSON.parse(e.target.result);
+
+    // Ensure that complexityFactors are initialized for each component
+    const updatedComponents = loadedData.map((component) => ({
+      ...component,
+      complexityFactors: component.complexityFactors || { dependencies: 1.0, integrations: 1.0 },
+    }));
+
+    setComponents(updatedComponents);
+  };
+  reader.readAsText(file);
+};
+
 
   const updateMetric = (id, metric, value) => {
     const numValue = parseInt(value) || 0;
@@ -103,6 +172,10 @@ const DotNetEstimateForge = () => {
       title: '',
       pattern: 'simple',
       complexity: 'medium',
+      complexityFactors: {
+        dependencies: 1.0,
+        integrations: 1.0,
+      },
       metrics: getInitialMetrics('domainModel'),
       assumptions: '',
       risks: ''
@@ -112,66 +185,98 @@ const DotNetEstimateForge = () => {
   const removeComponent = (id) => {
     setComponents(prev => prev.filter(c => c.id !== id));
   };
-
   const calculateEffort = (component) => {
     const typeConfig = componentTypes[component.type];
     let baseHours = 0;
+  
     Object.entries(component.metrics).forEach(([metric, value]) => {
       if (typeConfig.metrics[metric]) {
         baseHours += value * typeConfig.metrics[metric].hoursPerUnit;
       }
     });
-
+  
     const patternMultiplier = typeConfig.patterns[component.pattern].multiplier;
     const complexityMultiplier = complexityMultipliers[component.complexity];
-    const totalHours = Math.round(baseHours * patternMultiplier * complexityMultiplier);
+    const additionalComplexity = complexityFactors.dependencies * complexityFactors.integrations;
+  
+    const totalHours = Math.round(baseHours * patternMultiplier * complexityMultiplier * additionalComplexity);
     return { hours: totalHours, days: Math.round((totalHours / 8) * 10) / 10 };
   };
+  
+  
+
+     
 
   const exportToCsv = () => {
-    const headers = ['Component Title', 'Type', 'Pattern', 'Complexity', 'Effort (Hours)', 'Effort (Days)', 'Metrics', 'Assumptions', 'Risks'].join(',');
-    const rows = components.map(component => {
-      const effort = calculateEffort(component);
-      const metrics = Object.entries(component.metrics).map(([key, value]) => `${key}: ${value}`).join('; ');
-      return [
-        `"${component.title || 'Untitled'}"`,
-        `"${componentTypes[component.type].name}"`,
-        `"${componentTypes[component.type].patterns[component.pattern].name}"`,
-        `"${component.complexity}"`,
-        effort.hours,
-        effort.days,
-        `"${metrics}"`,
-        `"${(component.assumptions || '').replace(/"/g, '""')}"`,
-        `"${(component.risks || '').replace(/"/g, '""')}"`,
+    try {
+      const headers = [
+        'Component Title',
+        'Type',
+        'Pattern',
+        'Role',
+        'Complexity',
+        'Dependencies Multiplier',
+        'Integrations Multiplier',
+        'Metrics',
+        'Assumptions',
+        'Risks'
       ].join(',');
-    });
-
-    const totalEffort = components.reduce(
-      (acc, component) => {
-        const effort = calculateEffort(component);
-        return { hours: acc.hours + effort.hours, days: acc.days + effort.days };
-      }, { hours: 0, days: 0 }
-    );
-
-    rows.push(['"TOTAL"', '""', '""', '""', totalEffort.hours, totalEffort.days, '""', '""', '""'].join(','));
-
-    const csvContent = [headers, ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `project_estimate_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  
+      const rows = components.map((component) => {
+        const metrics = Object.entries(component.metrics)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('; ');
+  
+        return [
+          `"${component.title || 'Untitled'}"`,
+          `"${component.type}"`,
+          `"${component.pattern}"`,
+          `"${component.role}"`,
+          `"${component.complexity}"`,
+          component.complexityFactors.dependencies,
+          component.complexityFactors.integrations,
+          `"${metrics}"`,
+          `"${(component.assumptions || '').replace(/"/g, '""')}"`,
+          `"${(component.risks || '').replace(/"/g, '""')}"`,
+        ].join(',');
+      });
+  
+      // Add total row if needed (example calculation of total effort)
+      const csvContent = [headers, ...rows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `project_estimate_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Error exporting CSV. Please check console for details.');
+    }
   };
+  
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="bg-white rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-6">
+ 
+          <div className="flex space-x-4">
+      <button onClick={saveProject} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+        Save Project
+      </button>
+      
+      <label className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer">
+        Load Project
+        <input type="file" onChange={loadProject} className="hidden" />
+      </label>
+    </div>
+
+
             <h2 className="text-2xl font-bold">.NET Project Estimate Generator</h2>
             <button 
               onClick={exportToCsv} 
@@ -212,6 +317,19 @@ const DotNetEstimateForge = () => {
                       <option key={key} value={key}>{pattern.name}</option>
                     ))}
                   </select>
+                  
+                 
+            <select className="flex-1 p-2 border rounded-md"
+              onChange={(e) => updateComponent(component.id, 'role', e.target.value)}
+              value={component.role} // Binds the dropdown value to the component's role
+            >
+              {Object.keys(roles).map((roleKey) => (
+                <option key={roleKey} value={roleKey}>
+                  {roles[roleKey].name}
+                </option>
+              ))}
+            </select>
+         
                   <select 
                     className="flex-1 p-2 border rounded-md"
                     value={component.complexity}
@@ -228,6 +346,7 @@ const DotNetEstimateForge = () => {
                     <Minus className="w-5 h-5" />
                   </button>
                 </div>
+              
 
                 <input 
                   type="text"
@@ -255,6 +374,50 @@ const DotNetEstimateForge = () => {
                       </div>
                     ))}
                   </div>
+                 {/* Complexity Factor Inputs */}
+          <div className="flex space-x-4">
+            <div className="flex flex-col items-center">
+              <label className="text-lg font-semibold text-gray-700 mb-2">
+                Dependencies Multiplier
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={component.complexityFactors.dependencies}
+                onChange={(e) =>
+                  updateComplexityFactor(
+                    component.id,
+                    'dependencies',
+                    parseFloat(e.target.value)
+                  )
+                }
+                className="w-24 p-3 text-xl text-center border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex flex-col items-center">
+              <label className="text-lg font-semibold text-gray-700 mb-2">
+                Integrations Multiplier
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={component.complexityFactors.integrations}
+                onChange={(e) =>
+                  updateComplexityFactor(
+                    component.id,
+                    'integrations',
+                    parseFloat(e.target.value)
+                  )
+                }
+                className="w-24 p-3 text-xl text-center border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+                   
+
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -295,10 +458,13 @@ const DotNetEstimateForge = () => {
             <Plus className="w-5 h-5 mr-2" />
             Add Component
           </button>
+
         </div>
       </div>
     </div>
   );
 };
+// Function to save the project to localStorage or as a file
+
 
 export default DotNetEstimateForge;
